@@ -1,0 +1,386 @@
+---
+title: "Projek SPL"
+author: "Dinda Dwi Anugrah Pertiwi"
+output:
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Projek Supervised Learning
+
+**Tugas project :**
+
+1.  Membangkitkan data yg sisaan ber **autokorelasi** (dibuktikan dengan uji **Durbin Watson**).
+
+2.  Membangkitkan data X yang saling **multikolinearitas** (dibuktikan dengan uji **VIF**).
+
+3.  Membangkitkan data dengan sisaan **Normal baku** (0,1) , dibuktikan dengan uji **kenormalan**.
+
+4.  Membangkitkan data dengan sisaan **tidak homogen** (dibuktikan dengan uji **BP**).
+
+------------------------------------------------------------------------
+
+## Membangkitkan data yg sisaan ber **autokorelasi** (dibuktikan dengan uji **Durbin Watson**)
+
+Rumus umum :
+
+$Y_t = \beta_0 + \beta_1 X_t + \varepsilon_t$
+
+**Ciri-ciri data yang berAutokorelasi :**
+
+1.  Residual antar pengamatan saling berkorelasi
+
+2.  Nilai residual membentuk pola berulang
+
+3.  Sering muncul pada data time series
+
+**Interpretasi Statistika Durbin Watson :**
+
+1.  $D \approx 2$ : Tidak ada Autokorelasi
+
+2.  $D < 0$ : Autokorelasi positif
+
+3.  $D > 4$ : Autokorelasi negatif
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+#PACKAGE
+library(lmtest)
+```
+
+```{r, echo=TRUE}
+#MEMBANGKITKAN DATA DENGAN SISAAN BERAUTOKORELASI
+
+set.seed(123)
+n <- 160
+
+#PARAMETER
+beta_0 <- 5
+beta_1 <- 2
+
+#ERROR (RHO = 0.8)
+rho <- 0.8
+u <- arima.sim(model = list(ar = rho), n = n, sd = 3)
+
+#VARIABEL X
+var_x <- rnorm(n, mean = 60, sd = 10)
+
+#VARIABEL Y
+var_y <- beta_0 + beta_1 * var_x + u
+```
+
+**Interpretasi:**
+
+Error tersebut **tidak acak murni**, melainkan setiap nilai $u_t$ bergantung pada nilai sebelumnya $u_{t-1}$ melalui parameter $\rho = 0.8$. Artinya, kalau terdapat error besar pada waktu sebelumnya, kemungkinan besar error berikutnya juga besar.
+
+```{r, echo=TRUE}
+#MODEL REGRESI
+model_reg <- lm( var_y ~ var_x)
+
+#SUMMARY MODEL
+summary(model_reg)
+```
+
+```{r, echo=TRUE}
+#DURBIN WATSON
+dwtest(model_reg)
+```
+
+**Interpretasi:**
+
+Berdasarkan hasil regresi, koefisien var_x = 2.03676 (intercept = 2.837) mendekati nilai parameter sebenarnya, dan signifikan secara statistik (**p-value \< 0.05**), menunjukkan X berpengaruh nyata terhadap Y. $R^2 = 0.9573 \to 95.7%$ variasi Y dijelaskan oleh X, dan **RSE = 4.226** menunjukkan residual relatif kecil. Berdasarkan hasil uji Durbin–Watson (**DW = 0.49982, p-value \< 0.05**), terdapat **autokorelasi positif** yang signifikan pada sisaan model regresi.
+
+```{r, echo=TRUE}
+#VISUALISASI
+
+par(mfrow = c(2,1))
+
+#PLOT RESIDUAL
+plot(resid(model_reg), type = "l", col = "navy", lwd = 2,
+     main = "Plot Residual",
+     xlab = "Obeservasi",
+     ylab = "Residual")
+
+#PLOT AUTOCORRELATION FUNCTION (ACF)
+acf(resid(model_reg), main = "Plot ACF Residual")
+```
+
+**Interpretasi:**
+
+1.  **Plot Residual**
+
+    Pola residual terlihat **bergelombang** dan tidak acak sepenuhnya, yang berarti nilai residual cenderung dipengaruhi oleh nilai residual sebelumnya (ciri dari autokorelasi positif).
+
+2.  **Plot ACF**
+
+    Pada beberapa Lag awal memiliki nilai korelasi **di luar batas signifikan** (garis biru putus-putus), yang berarti residual memang berAutokorelasi secara signifikan.
+
+## Membangkitkan data X yang saling **multikolinearitas** (dibuktikan dengan uji **VIF**)
+
+Rumus VIF :
+
+$VIF_i = \frac{1}{1 - R_i^2}$
+
+**Ciri-ciri data yang saling Multikolinearitas :**
+
+1.  Variabel independen saling berkorelasi tinggi.
+
+2.  VIF (*Variance Inflation Factor*) yang sangat tinggi (lebih dari 10).
+
+3.  Koefisien regresi yang tidak stabil (Koefisien berubah drastis saat variabel ditambah atau dikurangi).
+
+4.  R-squared tinggi, namun model tidak memberikan informasi yang jelas tentang hubungan antara variabel dependen dan independen.
+
+5.  T-value yang kecil meskipun secara teoritis variabel seharusnya signifikan.
+
+**Interpretasi VIF :**
+
+1.  $VIF < 1$ : Tidak ada multikolinearitas.
+
+2.  $1 < VIF < 5$ : Multikolinearitas sedang (masih dapat diterima).
+
+3.  $5 < VIF < 10$ : Multikolinearitas tinggi.
+
+4.  $VIF > 10$ : Multikolinearitas sangat tinggi.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+#PACKAGE
+
+library(car)
+library(corrplot)
+```
+
+```{r, echo=TRUE}
+#MEMBANGKITKAN DATA
+
+set.seed(123)
+n <- 150
+
+#VARAIBEL X
+var_x1 <- rnorm(n, mean = 0, sd = 1)
+var_x2 <- 0.9 * var_x1 + rnorm(n, mean = 0, sd = 0.1)
+var_x3 <- 0.5 * var_x1 + 0.4 * var_x2 + rnorm(n, mean = 0, sd = 0.1)
+
+#VARIABEL Y
+var_y <- 2 * var_x1 + 3 * var_x2 + 4 * var_x3 + rnorm(n, mean = 0, sd = 1)
+```
+
+```{r, echo=TRUE}
+#MODEL REGRESI
+model_reg <- lm(var_y ~ var_x1 + var_x2 + var_x3)
+
+#SUMMARY MODEL
+summary(model_reg)
+```
+
+**Interpretasi :**
+
+Berdasarkan hasil regresi, ketiga variabel bebas berpengaruh signifikan terhadap Y karena memiliki nilai $P-Value < 0.05$. Nilai koefisien $X_1 = 1.78255$, $X_2 = 3.14008$, $X_3 = 4.06928$ menunjukkan arah hubungan positif, yang berarti peningkatan pada masing-masing variabel meningkatkan nilai Y. Nilai $R^2 = 0.9848$ yang berarti sekitar 98.48% variasi Y dapat dijelaskan oleh ketiga variabel bebas dalam model, sedangkan $RSE = 0.9534$ menunjukkan bahwa sisaannya relatif kecil.
+
+```{r, echo=TRUE}
+#MENGHITUNG VIF
+val_vif <- vif(model_reg)
+
+#HASIL VIF
+print(val_vif)
+```
+
+**Interpretasi :**
+
+Hasil uji multikolinearitas menunjukkan nilai VIF masing-masing sebesar $X_1 = 110.087$, $X_2 = 89.4913$, dan $X_3 = 62.2203$. Karena dari ketiga variabel tersebut \> 10, maka terdapat multikolinearitas tinggi, yang berarti variabel bebas saling berkorelasi kuat satu sama lain.
+
+```{r, echo=TRUE}
+#VISUALISASI
+
+#CORRPLOT
+corr_matrix <- cor(data.frame(var_x1, var_x2, var_x3))
+corrplot(corr_matrix, method = "circle", addCoef.col = "white")
+```
+
+**Interpretasi :**
+
+**Corrplot**
+
+Hasil Corrplot menunjukkan matriks korelasi antara tiga variabel, yaitu var_x1, var_x2, dan var_x3. Nilai **korelasi yang sangat tinggi** (hampir 1.00) di antara ketiganya, seperti yang terlihat pada nilai 1.00 di diagonal utama dan nilai 0.99 pada off-diagonal, mengindikasikan **hubungan yang sangat kuat** dan hampir sempurna antara ketiga variabel tersebut. Ini menunjukkan bahwa ketiga variabel tersebut sangat berkorelasi satu sama lain, sehingga perubahan pada satu variabel cenderung diikuti oleh perubahan yang hampir serupa pada variabel lainnya.
+
+## Membangkitkan data dengan sisaan **Normal baku** (0,1) , dibuktikan dengan uji **kenormalan**
+
+**Ciri-ciri data berdistribusi normal baku :**
+
+1.  Nilai rata-rata = 0
+2.  Simpangan bakku = 1
+3.  Bentuk distribusi simetris (kurva berbentuk lonceng)
+4.  Nilai $skewness \approx 0$ dan $kurtosis \approx 3$
+5.  Sebaran probabilitas mengikuti pola empiris
+    -   Sekitar **68%** data berada di antara $Z = -1$ dan $Z = +1$
+
+    -   Sekitar **95%** data berada di antara $Z = -2$ dan $Z = +2$
+
+    -   Sekitar **99.7%** data berada di antara $Z = -3$ dan $Z = +3$
+
+**Interpretasi uji Shapiro Wilk :**
+
+1.  Jika $P-value > 0.05$, maka gagal menolak $H_0$ yang berarti data berdistribusi normal
+2.  Jika $P-value < 0.05$, maka tolak $H_0$ yang berarti data tidak berdistribusi normal
+
+```{r, echo=TRUE}
+#MEMBANGKITKAN DATA
+
+set.seed(123)
+n <- 200
+
+#PARAMETER
+beta_0 <- 10
+beta_1 <- 2.5
+
+#ERROR
+error <- rnorm(n, mean = 0, sd = 1)
+
+#VARIABEL X
+var_x <- rnorm(n, mean = 50, sd = 10)
+
+#VARIABEL Y
+var_y <- beta_0 + beta_1 * var_x + error
+```
+
+```{r, echo=TRUE}
+#MODEL REGRESI
+model_reg <- lm(var_y ~ var_x)
+
+summary(model_reg)
+```
+
+**Interpretasi :**
+
+Berdasarkan hasil regresi, variabel bebas X berpengaruh signifikan terhadap variabel terikat Y karena memiliki nilai $P-value < 0.05$. Nilai koefisien $X = 2.497376$ menunjukkan **hubungan positif**. Nilai $R^2 = 0.9986$ menunjukkan bahwa sekitar 99.86% variasi pada Y dapat dijelaskan oleh model regresi yang dibentuk, sedangkan nilai $RSE = 0.9452$ menandakan bahwa sisaan **model relatif kecil**.
+
+```{r, echo=TRUE}
+#UJI NORMALITAS RESIDUAL
+
+#SHAPIRO WILK
+shapiro.test(resid(model_reg))
+
+#MEMERIKSA MEAN DAN SD
+resi <- resid(model_reg)
+
+mean_resi <- mean(resi)
+cat("Mean of Residuals: ", mean_resi, "\n")
+sd_resi <- sd(resi)
+cat("Standard Deviation of Residuals: ", sd_resi, "\n")
+```
+
+**Interpretasi :**
+
+Berdasarkan hasil uji Shapiro-Wilk untuk menguji kenormalan sisaan, nilai **W = 0.99035** dan **p-value = 0.201**. Karena $p-value > 0.05$, kita **gagal menolak** $H_0$ dan dapat menyimpulkan bahwa **sisaan model regresi mengikuti distribusi normal**.
+
+```{r, echo=TRUE}
+#VISUALISASI
+par(mfrow = c(1, 2))
+
+#HISTOGRAM
+resi <- residuals(model_reg)
+
+hist(resi,
+     breaks = 15,
+     main = "Histogram Residual",
+     col = "pink",
+     xlab = "Residual",
+     border = "navy",
+     freq = FALSE)
+
+curve(dnorm(x, mean = mean(resi), sd = sd(resi)),
+      col = "navy", lwd = 2, add = TRUE)
+
+abline(v = mean(resi), col = "red2", lwd = 2, lty = 2)
+
+#QQ PLOT
+qqnorm(resi, main = "Q-Q Plot Residual")
+qqline(resi, col = "brown", lwd = 2)
+
+```
+
+**Interpretasi :**
+
+1.  **Histogram**
+
+    Berdasarkan hasil dari histogram distribusi residual tampak mendekati bentuk normal, dengan puncak di sekitar nilai 0, yang berarti bahwa model memiliki kesalahan yang berdistribusi secara acak. Garis vertikal merah pada histogram menunjukkan nilai rata-rata residual yang dekat dengan 0, yang merupakan indikasi bahwa model tidak bias.
+
+2.  **QQ Plot**
+
+    Berdasarkan hasil QQ Plot, titk-titik pada plot sudah hampir sejajar semuanya dengan garis diagonal, yang menandakan bahwa residual mengikuti distribusi normal.
+
+## Membangkitkan data dengan sisaan **tidak homogen** (dibuktikan dengan uji **BP**)
+
+**Ciri-ciri data dengan sisaan tidak homogen (heteroskedastisitas) :**
+
+1.  Varians residual tidak konstan di seluruh rentang X atau fitted value.
+2.  Pada plot residual vs fitted, titik-titik membentuk pola kipas atau corong, bukan menyebar acak.
+3.  Uji Breusch–Pagan menghasilkan p-value \< 0.05, artinya terdapat heteroskedastisitas.
+
+```{r, echo=TRUE}
+#PACKAGE
+
+library(lmtest)
+library(ggplot2)
+```
+
+```{r, echo=TRUE}
+#MEMBANGKITKAN DATA
+
+set.seed(123)
+n <- 200
+
+#VARIABEL X
+var_x <- rnorm(n, mean = 50, sd = 10)
+
+#ERROR
+error <- rnorm(n, mean = 0, sd = var_x)
+
+#VARIABEL Y
+var_y <- 5 + 2 * var_x + error
+```
+
+```{r, echo=TRUE}
+#MODEL REGRESI
+
+model_reg <- lm(var_y ~ var_x)
+
+summary(model_reg)
+```
+
+**Interpretasi :**
+
+Berdasarkan hasil regresi, variabel bebas (var_x) **berpengaruh signifikan** terhadap variabel terikut (var_y) karena memiliki nilai $P-Value < 0.05)$. Nilai koefisien $X = 2.0670$ menunjukkan hubungan yg positif antara var_x dan var_y. Nilai $R^2 = 0.1293$ menunjukkan bahwa sekitar 12.93% variasi pada var_y dapat dijelaskan oleh model regresi yang dibentuk, sedangkan nilai $RSE = 50.71$ menandakan bahwa sisaan model **relatif besar**, yang menunjukkan adanya variasi prediksi yang **cukup tinggi.**
+
+```{r, echo=TRUE}
+#BREUSCH PAGAN
+
+test_bp <- bptest(model_reg)
+print(test_bp)
+```
+
+**Interpretasi :**
+
+Berdasarkan hasil uji Breusch-Pagan (BP), nilai BP = 14.712 dengan $p-value = 0.0001253$ menunjukkan adanya **heteroskedastisitas** yang signifikan dalam model regresi. Karena $p-value < 0.05$, kita **menolak** $H_0$ yang menyatakan bahwa varians sisaan bersifat homogen.
+
+```{r, echo=TRUE}
+fitted_values <- fitted(model_reg)
+residuals <- resid(model_reg)
+
+# Membuat plot
+ggplot(data = data.frame(fitted_values, residuals),
+       aes(x = fitted_values, y = residuals)) +
+  geom_point(color = "navy") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  ggtitle("Plot Residuals vs Fitted Values") +
+  xlab("Fitted Values (Predicted)") +
+  ylab("Residuals (Error)") +
+  theme_minimal()
+```
+
+**Interpretasi :**
+
+Plot ini menunjukkan hubungan antara residual dan nilai yang diprediksi, dengan titik-titik **tersebar acak** di sekitar garis nol tanpa pola yang jelas. Hal ini mengindikasikan bahwa model **tidak menunjukkan bias atau heteroskedastisitas**, di mana varians residual tetap konsisten di seluruh rentang nilai prediksi. Secara keseluruhan, distribusi residual yang acak ini mengonfirmasi bahwa asumsi homoskedastisitas dan ketiadaan pola sistematis terpenuhi, menandakan model yang baik.
