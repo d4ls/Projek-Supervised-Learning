@@ -1,0 +1,98 @@
+---
+title: "Projek SPL"
+author: "Dinda Dwi Anugrah Pertiwi"
+output:
+  pdf_document:
+    toc: true
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# PROJEK SUPERVISED LEARNING
+
+Universitas ingin mengetahui faktor-faktor yang memengaruhi kelulusan tepat waktu mahasiswa (1=lulus tepat waktu).
+
+Masukkan data ke R (`data2.txt`), fit modelnya, buat assesement model kemudian jawab pertanyaan berikut:
+
+1.  Apakah GPA berpengaruh signifikan terhadap peluang kelulusan?
+
+2.  Bagaimana tanda koefisien part_time_job diinterpretasikan?
+
+3.  Apa arti hasil uji Hosmer-Lemeshow yang signifikan/tidak signifikan?
+
+4.  Jika GPA naik 1 poin, berapa kali lipat peluang kelulusan meningkat?
+
+## INPUT DATA
+
+```{r, echo=TRUE}
+#INPUT DATA
+data_mahasiswa <- read.table("C:/Users/dals/OneDrive - untirta.ac.id/KULIAH/Sem 5/SPL/DATA/data2.txt", header = TRUE)
+
+head(data_mahasiswa, 10)
+str(data_mahasiswa)
+```
+
+## REGRESI LOGISTIK
+
+```{r, echo=TRUE}
+#PEMODELAN
+model_logit <- glm(graduate ~ GPA + attendance + part_time_job,
+                       data = data_mahasiswa,
+                       family = binomial(link = "logit"))
+
+summary(model_logit)
+```
+
+## Jawaban
+
+### Apakah GPA berpengaruh signifikan terhadap peluang kelulusan?
+
+```{r, echo=TRUE}
+summary(model_logit)$coefficients["GPA", ]
+```
+
+Interpretasi hasil:
+
+-   Dari hasil pemodelan dengan regresi logistik didapatkan nilai p-value sebesar 1.173744e-12 yang dimana nilai tersebut \< 0.05 yang berarti GPA berpengaruh signifikan terhadap peluang kelulusan tepat waktu.
+
+-   Koefisien bertanda positif menunjukkan bahwa semakin tinggi GPA, peluang mahasiswa untuk lulus tepat waktu meningkat.
+
+### Bagaimana tanda koefisien part_time_job diinterpretasikan?
+
+```{r, echo=TRUE}
+summary(model_logit)$coefficients["part_time_job", ]
+```
+
+Interperetasi hasil:
+
+-   Dari hasil pemodelan dengan regresi logistik didapatkan nilai p-value sebesar 0.008034263 yang dimana nilai tersebut \< 0.05 yang berarti part_time_job berpengaruh signifikan terhadap peluang kelulusan tepat waktu.
+
+-   Koefisien bertanda negatif (-0.734634759) menunjukkan bahwa mahasiswa yang memiliki part time job (pekerjaan paruh waktu) memiliki peluang lebih rendah untuk lulus tepat waktu dibandingkan mahasiswa yang tidak bekerja.
+
+### Apa arti hasil uji Hosmer-Lemeshow yang signifikan/tidak signifikan?
+
+```{r, echo=TRUE}
+#Hosmer-Lemeshow
+library(ResourceSelection)
+hoslem.test(data_mahasiswa$graduate, fitted(model_logit))
+```
+
+Interpretasi hasil:
+
+-   Dari hasil uji Hosmer-Lemeshow diperoleh nilai p-value sebesar 0.06375 yang dimana nilai tersebut \> 0.05 yang berarti tidak terdapat perbedaan yang signifikan antara nilai yang diprediksi oleh model dan nilai observasi pada data (model regresi logistik memiliki kecocokan yang baik dan sesuai dengan data).
+
+### Jika GPA naik 1 poin, berapa kali lipat peluang kelulusan meningkat?
+
+```{r, echo=TRUE}
+#Menghitung odds ratio
+exp(coef(model_logit)["GPA"])
+```
+
+Interpretasi hasil:
+
+-   Dari hasil odds ratio untuk GPA didapatkan nilai sebesar 23.68725, yang berarti jika GPA naik 1 poin maka peluang mahasiswa untuk lulus tepat waktu meningkat 23.68725 kali dengan asumsi attendance dan part time job tetap.
